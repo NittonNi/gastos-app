@@ -660,14 +660,13 @@ function renderGruposList(gs) {
   }
   el.innerHTML = gs.map(g => `
     <div class="card" style="margin-bottom:8px">
-      <div class="card-row" onclick="openGrupo('${g.id}')">
+      <div class="card-row" onclick="openGrupo('${g.id}')" oncontextmenu="grupoOpciones(event,'${g.id}','${g.nombre}','${g.owner_id}')">
         <div class="card-icon purple" style="font-size:20px">${g.nombre[0].toUpperCase()}</div>
         <div class="card-info">
           <div class="card-name">${g.nombre}</div>
           <div class="card-meta">${g.descripcion || 'Grupo compartido'}</div>
         </div>
-        <span class="chevron">›</span>
-      </div>
+<button onclick="event.stopPropagation();grupoOpciones(event,'${g.id}','${g.nombre}','${g.owner_id}')" style="background:none;border:none;color:var(--muted);font-size:20px;padding:4px 8px;cursor:pointer">⋯</button>      </div>
     </div>`).join('');
 }
 
@@ -940,6 +939,36 @@ async function saveGasto() {
 }
 
 // ── CREAR GRUPO ───────────────────────────────────────────────────────────────
+  function grupoOpciones(e, id, nombre, ownerId) {
+  e.preventDefault();
+  const esOwner = ownerId === user.id;
+  const opciones = esOwner
+    ? [
+        { txt: `Eliminar "${nombre}"`, fn: () => eliminarGrupo(id, nombre) },
+        { txt: 'Cancelar', fn: null }
+      ]
+    : [
+        { txt: `Salir de "${nombre}"`, fn: () => salirGrupo(id, nombre) },
+        { txt: 'Cancelar', fn: null }
+      ];
+  if (confirm(esOwner ? `¿Eliminar el grupo "${nombre}"? Esto borrará todos los gastos.` : `¿Salir del grupo "${nombre}"?`)) {
+    esOwner ? eliminarGrupo(id, nombre) : salirGrupo(id, nombre);
+  }
+}
+
+async function eliminarGrupo(id, nombre) {
+  const { error } = await sb.from('grupos').delete().eq('id', id);
+  if (error) { toast('Error al eliminar'); return; }
+  toast(`Grupo "${nombre}" eliminado`);
+  loadHome();
+}
+
+async function salirGrupo(id, nombre) {
+  const { error } = await sb.from('grupo_miembros').delete().eq('grupo_id', id).eq('user_id', user.id);
+  if (error) { toast('Error al salir'); return; }
+  toast(`Has salido de "${nombre}"`);
+  loadHome();
+}
 function showCrearGrupo() { openDrawer('grupo'); }
 
 async function crearGrupo() {
