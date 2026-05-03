@@ -1124,8 +1124,9 @@ function showConfirm(args, grupoId) {
 
 function cancelConfirm() {
   document.getElementById('confirm-msg')?.remove();
+  const gid = pendingArgs?.grupoId || '';
   pendingArgs = null;
-  appendMsg('ia', 'Cancelado. ¿Quieres cambiar algo?', 'Cancelado.', pendingArgs?.grupoId||'');
+  appendMsg('ia', 'Cancelado. ¿Quieres cambiar algo?', 'Cancelado.', gid);
 }
 
 async function doConfirm() {
