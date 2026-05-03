@@ -2,7 +2,7 @@
   "name": "Gastos",
   "short_name": "Gastos",
   "description": "Gestiona lo que pagas tú y lo que pagáis juntos",
-  "start_url": "/",
+  "start_url": "/gastos-app/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#007aff",
