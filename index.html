@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Gastos">
+<meta name="theme-color" content="#ffffff">
+<title>Gastos</title>
+<link rel="manifest" href="manifest.json">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#f5f5f7;--card:#fff;--border:#e5e5ea;--text:#1c1c1e;--muted:#8e8e93;
+  --accent:#007aff;--accent2:#34c759;--danger:#ff3b30;--warning:#ff9500;
+  --radius:14px;--radius-sm:10px;--safe-bottom:env(safe-area-inset-bottom,0px);
+  --safe-top:env(safe-area-inset-top,0px);
+  --shadow:0 2px 12px rgba(0,0,0,.08);--shadow-lg:0 8px 32px rgba(0,0,0,.12)
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#000;--card:#1c1c1e;--border:#2c2c2e;--text:#fff;--muted:#8e8e93;--shadow:0 2px 12px rgba(0,0,0,.3)
+}}
+html,body{height:100%;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:var(--bg);color:var(--text);font-size:16px}
+
+/* SCREENS */
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .35s;z-index:1}
+.screen.hidden{transform:translateY(100%);opacity:0;pointer-events:none}
+.screen.slide-left{transform:translateX(100%);opacity:0;pointer-events:none}
+
+/* LOADING */
+#screen-loading{align-items:center;justify-content:center;gap:0;z-index:100}
+.loading-icon{width:72px;height:72px;border-radius:18px;background:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:16px;animation:iconIn .5s cubic-bezier(.34,1.56,.64,1) both}
+.loading-icon svg{animation:iconPulse 2s ease-in-out infinite}
+@keyframes iconIn{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
+@keyframes iconPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.loading-name{font-size:26px;font-weight:700;letter-spacing:-.5px;margin-bottom:4px;animation:fadeUp .4s .15s both}
+.loading-sub{font-size:14px;color:var(--muted);margin-bottom:32px;animation:fadeUp .4s .25s both}
+.loading-progress{width:160px;height:3px;background:var(--border);border-radius:2px;overflow:hidden;animation:fadeUp .4s .3s both}
+.loading-fill{height:100%;background:var(--accent);border-radius:2px;animation:fill 2.5s .4s ease-out forwards}
+@keyframes fill{0%{width:0%}100%{width:100%}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* AUTH */
+#screen-auth{padding:0;overflow-y:auto}
+.auth-hero{padding:calc(var(--safe-top) + 60px) 24px 32px;text-align:center}
+.auth-logo{width:80px;height:80px;border-radius:20px;background:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 20px}
+.auth-title{font-size:30px;font-weight:700;letter-spacing:-.5px;margin-bottom:8px}
+.auth-sub{font-size:15px;color:var(--muted);line-height:1.5}
+.auth-tabs{display:flex;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:3px;margin:0 24px 24px}
+.auth-tab{flex:1;padding:8px;border-radius:10px;border:none;background:none;font-size:14px;font-weight:500;color:var(--muted);cursor:pointer;transition:all .2s}
+.auth-tab.on{background:var(--accent);color:#fff}
+.auth-form{padding:0 24px 32px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.field input{width:100%;padding:13px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:16px;background:var(--card);color:var(--text);outline:none;transition:border .15s}
+.field input:focus{border-color:var(--accent)}
+.btn-main{width:100%;padding:15px;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-size:16px;font-weight:600;cursor:pointer;transition:all .15s;margin-top:4px}
+.btn-main:active{transform:scale(.97);opacity:.9}
+.btn-main.green{background:var(--accent2)}
+.btn-main.danger{background:var(--danger)}
+.btn-main.ghost{background:none;color:var(--accent);border:1.5px solid var(--accent)}
+.auth-error{background:#fff0f0;color:var(--danger);padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:14px;display:none}
+.auth-error.show{display:block}
+
+/* HOME */
+#screen-home{padding-top:var(--safe-top)}
+.home-header{padding:20px 20px 0;display:flex;align-items:center;justify-content:space-between}
+.home-greeting{font-size:22px;font-weight:700;letter-spacing:-.3px}
+.home-sub{font-size:14px;color:var(--muted);margin-top:2px}
+.avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#fff;cursor:pointer;flex-shrink:0}
+.home-scroll{flex:1;overflow-y:auto;padding:16px 20px calc(20px + var(--safe-bottom))}
+.section-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;margin-top:20px}
+.section-title:first-child{margin-top:0}
+
+/* CARDS */
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:10px;overflow:hidden;border:1px solid var(--border)}
+.card-row{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;transition:background .15s}
+.card-row:active{background:var(--border)}
+.card-row+.card-row{border-top:1px solid var(--border)}
+.card-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px}
+.card-icon.blue{background:#e8f4ff}
+.card-icon.green{background:#e8faf0}
+.card-icon.purple{background:#f0eaff}
+.card-icon.orange{background:#fff3e0}
+.card-info{flex:1;min-width:0}
+.card-name{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-meta{font-size:13px;color:var(--muted);margin-top:1px}
+.card-right{text-align:right;flex-shrink:0}
+.card-amount{font-size:15px;font-weight:600}
+.card-amount.red{color:var(--danger)}
+.card-amount.green{color:var(--accent2)}
+.chevron{color:var(--muted);font-size:14px;margin-left:4px}
+
+/* FAB */
+.fab{position:fixed;bottom:calc(20px + var(--safe-bottom));right:20px;width:56px;height:56px;border-radius:28px;background:var(--accent);color:#fff;border:none;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,122,255,.4);cursor:pointer;transition:all .2s;z-index:50}
+.fab:active{transform:scale(.92)}
+
+/* NAV */
+.bottom-nav{background:var(--card);border-top:1px solid var(--border);display:flex;padding:8px 0 calc(8px + var(--safe-bottom));flex-shrink:0}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;border:none;background:none;color:var(--muted);cursor:pointer;padding:4px 0;transition:color .15s}
+.nav-btn.on{color:var(--accent)}
+.nav-btn svg{width:24px;height:24px}
+.nav-lbl{font-size:10px;font-weight:500}
+
+/* DRAWER */
+.drawer-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;opacity:0;pointer-events:none;transition:opacity .3s}
+.drawer-bg.show{opacity:1;pointer-events:all}
+.drawer{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-radius:20px 20px 0 0;z-index:201;transform:translateY(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);max-height:92vh;overflow-y:auto;padding-bottom:var(--safe-bottom)}
+.drawer.show{transform:translateY(0)}
+.drawer-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:10px auto 0}
+.drawer-header{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.drawer-title{font-size:17px;font-weight:700}
+.drawer-close{width:28px;height:28px;border-radius:50%;background:var(--border);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px}
+.drawer-body{padding:20px}
+
+/* FORM ELEMENTS */
+.form-group{margin-bottom:16px}
+.form-label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;display:block}
+.form-input{width:100%;padding:13px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:16px;background:var(--bg);color:var(--text);outline:none;transition:border .15s;-webkit-appearance:none}
+.form-input:focus{border-color:var(--accent)}
+.form-select{width:100%;padding:13px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:16px;background:var(--bg);color:var(--text);outline:none;-webkit-appearance:none;cursor:pointer}
+.form-select:focus{border-color:var(--accent)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:4px}
+.chip{padding:7px 14px;border-radius:20px;border:1.5px solid var(--border);font-size:14px;cursor:pointer;background:var(--card);color:var(--muted);transition:all .15s;white-space:nowrap;font-weight:500}
+.chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.chip.green.on{background:var(--accent2);border-color:var(--accent2)}
+.member-chip{display:flex;align-items:center;gap:6px;padding:6px 12px 6px 6px;border-radius:20px;border:1.5px solid var(--border);cursor:pointer;background:var(--card);transition:all .15s}
+.member-chip.on{border-color:var(--accent);background:#e8f4ff}
+.member-chip .mini-av{width:26px;height:26px;border-radius:50%;font-size:11px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center}
+.member-chip .mc-name{font-size:14px;font-weight:500}
+
+/* AMOUNT INPUT */
+.amount-row{display:flex;gap:8px;align-items:stretch}
+.currency-select{padding:13px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:15px;background:var(--bg);color:var(--text);outline:none;cursor:pointer;flex-shrink:0;min-width:70px}
+.amount-input{flex:1;padding:13px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:22px;font-weight:600;background:var(--bg);color:var(--text);outline:none;-webkit-appearance:none}
+.amount-input:focus,.currency-select:focus{border-color:var(--accent)}
+
+/* STATUS BADGES */
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:600}
+.badge.blue{background:#e8f4ff;color:var(--accent)}
+.badge.green{background:#e8faf0;color:var(--accent2)}
+.badge.red{background:#ffeeee;color:var(--danger)}
+.badge.gray{background:var(--border);color:var(--muted)}
+
+/* GRUPO SCREEN */
+.grupo-header{padding:calc(var(--safe-top) + 12px) 20px 0;display:flex;align-items:center;gap:12px}
+.back-btn{width:34px;height:34px;border-radius:50%;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:var(--text)}
+.grupo-title-wrap{flex:1}
+.grupo-title{font-size:18px;font-weight:700;letter-spacing:-.3px}
+.grupo-members-count{font-size:13px;color:var(--muted)}
+.grupo-tabs{display:flex;padding:12px 20px 0;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+.grupo-tabs::-webkit-scrollbar{display:none}
+.grupo-tab{padding:10px 16px;border:none;background:none;font-size:14px;font-weight:500;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s}
+.grupo-tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.grupo-content{flex:1;overflow-y:auto;padding:16px 20px calc(80px + var(--safe-bottom))}
+
+/* DASHBOARD */
+.dash-total{background:linear-gradient(135deg,var(--accent),#0051d5);color:#fff;border-radius:var(--radius);padding:20px;margin-bottom:12px}
+.dash-total-lbl{font-size:13px;opacity:.8;margin-bottom:4px}
+.dash-total-val{font-size:36px;font-weight:700;letter-spacing:-.5px}
+.dash-total-sub{font-size:13px;opacity:.75;margin-top:4px}
+.person-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.person-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;box-shadow:var(--shadow)}
+.person-card-name{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.person-card-val{font-size:20px;font-weight:700}
+.person-card-pct{font-size:12px;color:var(--muted);margin-top:2px}
+.debt-box{border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px;border:1px solid}
+.debt-box.owes{background:#fff8e1;border-color:#ffd54f;color:#795548}
+.debt-box.ok{background:#e8faf0;border-color:#81c784;color:#2e7d32}
+.debt-title{font-size:15px;font-weight:700;margin-bottom:3px}
+.debt-detail{font-size:13px;opacity:.85;line-height:1.5}
+
+/* BAR CHART */
+.bar-chart{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;margin-bottom:12px}
+.bar-chart-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.bar-label{font-size:13px;color:var(--muted);width:70px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.bar-val{font-size:13px;font-weight:600;width:60px;text-align:right;flex-shrink:0}
+
+/* GASTO ROW */
+.gasto-row{display:flex;align-items:start;gap:12px;padding:13px 0;border-bottom:1px solid var(--border)}
+.gasto-row:last-child{border-bottom:none}
+.gasto-cat-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;background:var(--bg)}
+.gasto-info{flex:1;min-width:0}
+.gasto-concepto{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gasto-meta{font-size:13px;color:var(--muted);margin-top:2px}
+.gasto-right{text-align:right;flex-shrink:0}
+.gasto-amount{font-size:15px;font-weight:700}
+.gasto-quien{font-size:12px;color:var(--muted);margin-top:2px}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:48px 20px;color:var(--muted)}
+.empty-icon{font-size:48px;margin-bottom:12px}
+.empty-title{font-size:17px;font-weight:600;color:var(--text);margin-bottom:6px}
+.empty-sub{font-size:14px;line-height:1.5}
+
+/* CHAT IA */
+.chat-wrap{display:flex;flex-direction:column;height:100%}
+.chat-msgs{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:82%;padding:11px 14px;border-radius:18px;font-size:15px;line-height:1.4;word-wrap:break-word;white-space:pre-wrap}
+.msg.user{background:var(--accent);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+.msg.ia{background:var(--card);border:1px solid var(--border);color:var(--text);align-self:flex-start;border-bottom-left-radius:4px}
+.msg.confirm{border:2px solid var(--accent);background:var(--card);align-self:stretch;border-radius:var(--radius-sm);max-width:100%}
+.chat-input-row{padding:10px 12px calc(10px + var(--safe-bottom));border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;background:var(--card)}
+.chat-txt{flex:1;padding:11px 14px;border:1.5px solid var(--border);border-radius:22px;font-size:15px;background:var(--bg);color:var(--text);outline:none}
+.chat-txt:focus{border-color:var(--accent)}
+.chat-btn{width:42px;height:42px;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .2s}
+.chat-send{background:var(--accent);color:#fff}
+.chat-mic{background:var(--card);color:var(--muted);border:1.5px solid var(--border)}
+.chat-mic.on{background:var(--danger);color:#fff;border-color:var(--danger);animation:micPulse .8s ease-in-out infinite}
+@keyframes micPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+.typing{display:flex;gap:4px;align-items:center;height:18px}
+.typing span{width:6px;height:6px;background:var(--muted);border-radius:50%;animation:blink 1.2s infinite both}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+.confirm-grid{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:14px;margin:10px 0}
+.confirm-key{color:var(--muted);font-size:13px}
+.confirm-val{font-weight:500}
+.confirm-btns{display:flex;gap:8px;margin-top:12px}
+.confirm-btn{flex:1;padding:10px;border-radius:var(--radius-sm);border:none;font-size:14px;font-weight:600;cursor:pointer}
+.confirm-btn.cancel{background:var(--border);color:var(--text)}
+.confirm-btn.ok{background:var(--accent);color:#fff}
+
+/* MIEMBROS */
+.member-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.member-row:last-child{border-bottom:none}
+.member-av{width:42px;height:42px;border-radius:50%;font-size:16px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.member-info{flex:1}
+.member-name{font-size:15px;font-weight:500}
+.member-role{font-size:13px;color:var(--muted)}
+.member-balance{text-align:right;font-size:14px;font-weight:600}
+
+/* TOAST */
+.toast{position:fixed;top:calc(var(--safe-top) + 12px);left:50%;transform:translateX(-50%) translateY(-80px);background:#1c1c1e;color:#fff;padding:11px 18px;border-radius:22px;font-size:14px;font-weight:500;z-index:999;transition:transform .3s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;max-width:90vw;text-align:center}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+/* PROFILE SCREEN */
+.profile-header{padding:calc(var(--safe-top) + 20px) 20px 24px;text-align:center;border-bottom:1px solid var(--border)}
+.profile-av{width:80px;height:80px;border-radius:50%;font-size:30px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+.profile-name{font-size:22px;font-weight:700}
+.profile-email{font-size:14px;color:var(--muted);margin-top:3px}
+.profile-scroll{flex:1;overflow-y:auto;padding:20px}
+
+/* INVITE */
+.invite-link{background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;color:var(--muted);word-break:break-all;margin-bottom:12px;font-family:monospace}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="screen" id="screen-loading">
+  <div class="loading-icon">
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+      <path d="M18 6C11.373 6 6 11.373 6 18s5.373 12 12 12 12-5.373 12-12S24.627 6 18 6zm1 17h-2v-6h2v6zm0-8h-2v-2h2v2z" fill="white"/>
+      <text x="18" y="23" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="16" font-weight="700" fill="white">€</text>
+    </svg>
+  </div>
+  <div class="loading-name">Gastos</div>
+  <div class="loading-sub">Gestiona lo que compartes</div>
+  <div class="loading-progress"><div class="loading-fill"></div></div>
+</div>
+
+<!-- AUTH -->
+<div class="screen hidden" id="screen-auth">
+  <div class="auth-hero">
+    <div class="auth-logo">
+      <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+        <text x="20" y="27" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="22" font-weight="700" fill="white">€</text>
+      </svg>
+    </div>
+    <div class="auth-title">Bienvenido a Gastos</div>
+    <div class="auth-sub">Controla lo que pagas tú<br>y lo que pagáis juntos</div>
+  </div>
+  <div class="auth-tabs">
+    <button class="auth-tab on" onclick="authTab('login')">Entrar</button>
+    <button class="auth-tab" onclick="authTab('signup')">Crear cuenta</button>
+  </div>
+  <div class="auth-form">
+    <div class="auth-error" id="auth-error"></div>
+    <div class="field" id="field-nombre" style="display:none">
+      <label>Tu nombre</label>
+      <input type="text" id="inp-nombre" placeholder="¿Cómo te llamas?">
+    </div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="inp-email" placeholder="tu@email.com">
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="inp-pass" placeholder="••••••••">
+    </div>
+    <button class="btn-main" id="auth-btn" onclick="doAuth()">Entrar</button>
+  </div>
+</div>
+
+<!-- HOME -->
+<div class="screen hidden" id="screen-home">
+  <div class="home-header">
+    <div>
+      <div class="home-greeting" id="home-greeting">Hola 👋</div>
+      <div class="home-sub" id="home-sub">¿Qué quieres hacer hoy?</div>
+    </div>
+    <div class="avatar" id="home-avatar" onclick="showProfile()" style="background:var(--accent)">N</div>
+  </div>
+  <div class="home-scroll">
+    <div class="section-title">Personal</div>
+    <div class="card">
+      <div class="card-row" onclick="openPersonal()">
+        <div class="card-icon blue">👤</div>
+        <div class="card-info">
+          <div class="card-name">Mis gastos</div>
+          <div class="card-meta" id="personal-meta">Cargando...</div>
+        </div>
+        <div class="card-right">
+          <div class="card-amount" id="personal-total">—</div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+    </div>
+
+    <div class="section-title">Grupos</div>
+    <div id="grupos-list">
+      <div class="card">
+        <div class="card-row" style="color:var(--muted);justify-content:center">
+          <div style="font-size:14px">Cargando grupos...</div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:8px">
+      <div class="card-row" onclick="showCrearGrupo()">
+        <div class="card-icon purple">＋</div>
+        <div class="card-info">
+          <div class="card-name">Crear grupo</div>
+          <div class="card-meta">Invita a otros a compartir gastos</div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+    </div>
+  </div>
+  <button class="fab" onclick="showAddGasto(null)" title="Añadir gasto">＋</button>
+</div>
+
+<!-- GRUPO SCREEN -->
+<div class="screen hidden slide-left" id="screen-grupo">
+  <div class="grupo-header">
+    <div class="back-btn" onclick="goHome()">‹</div>
+    <div class="grupo-title-wrap">
+      <div class="grupo-title" id="grupo-title">Grupo</div>
+      <div class="grupo-members-count" id="grupo-members-count"></div>
+    </div>
+    <div class="avatar" id="grupo-avatar" style="background:var(--accent);font-size:13px">G</div>
+  </div>
+  <div class="grupo-tabs">
+    <button class="grupo-tab on" onclick="grupoTab('gastos')">Gastos</button>
+    <button class="grupo-tab" onclick="grupoTab('dashboard')">Dashboard</button>
+    <button class="grupo-tab" onclick="grupoTab('ia')">Chat IA</button>
+    <button class="grupo-tab" onclick="grupoTab('miembros')">Miembros</button>
+  </div>
+  <div class="grupo-content" id="grupo-content"></div>
+  <button class="fab" onclick="showAddGasto(currentGrupo?.id)" title="Añadir gasto">＋</button>
+</div>
+
+<!-- PERSONAL SCREEN -->
+<div class="screen hidden slide-left" id="screen-personal">
+  <div class="grupo-header">
+    <div class="back-btn" onclick="goHome()">‹</div>
+    <div class="grupo-title-wrap">
+      <div class="grupo-title">Mis gastos</div>
+      <div class="grupo-members-count" id="personal-count"></div>
+    </div>
+  </div>
+  <div class="grupo-tabs">
+    <button class="grupo-tab on" onclick="personalTab('gastos')">Gastos</button>
+    <button class="grupo-tab" onclick="personalTab('dashboard')">Dashboard</button>
+    <button class="grupo-tab" onclick="personalTab('ia')">Chat IA</button>
+  </div>
+  <div class="grupo-content" id="personal-content"></div>
+  <button class="fab" onclick="showAddGasto(null,true)" title="Añadir gasto">＋</button>
+</div>
+
+<!-- PROFILE -->
+<div class="screen hidden slide-left" id="screen-profile">
+  <div class="profile-header">
+    <div class="back-btn" style="position:absolute;left:20px;top:calc(var(--safe-top) + 12px)" onclick="hideProfile()">‹</div>
+    <div class="profile-av" id="profile-av" style="background:var(--accent)">N</div>
+    <div class="profile-name" id="profile-name">Usuario</div>
+    <div class="profile-email" id="profile-email">email</div>
+  </div>
+  <div class="profile-scroll">
+    <div class="card">
+      <div class="card-row" onclick="showEditNombre()">
+        <div class="card-icon blue">✏️</div>
+        <div class="card-info"><div class="card-name">Cambiar nombre</div></div>
+        <span class="chevron">›</span>
+      </div>
+    </div>
+    <div class="card" style="margin-top:8px">
+      <div class="card-row" onclick="doLogout()" style="color:var(--danger)">
+        <div class="card-icon" style="background:#ffeeee">🚪</div>
+        <div class="card-info"><div class="card-name" style="color:var(--danger)">Cerrar sesión</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- DRAWER: ADD GASTO -->
+<div class="drawer-bg" id="drawer-bg" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer-gasto">
+  <div class="drawer-handle"></div>
+  <div class="drawer-header">
+    <div class="drawer-title">Nuevo gasto</div>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="form-group">
+      <label class="form-label">Importe</label>
+      <div class="amount-row">
+        <select class="currency-select" id="g-moneda">
+          <option value="EUR">€</option>
+          <option value="USD">$</option>
+          <option value="GBP">£</option>
+          <option value="KRW">₩</option>
+          <option value="JPY">¥</option>
+        </select>
+        <input type="number" class="amount-input" id="g-importe" placeholder="0,00" step="0.01" min="0" inputmode="decimal">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Concepto</label>
+      <input type="text" class="form-input" id="g-concepto" placeholder="Ej: Cena, Supermercado...">
+    </div>
+    <div class="form-group" id="g-quien-wrap">
+      <label class="form-label">Quién paga</label>
+      <div class="chips" id="g-quien-chips"></div>
+    </div>
+    <div class="form-group" id="g-para-wrap" style="display:none">
+      <label class="form-label">Para quién</label>
+      <div class="chips" id="g-para-chips"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Categoría</label>
+      <div class="chips" id="g-cat-chips"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Método</label>
+      <div class="chips" id="g-met-chips"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Fecha</label>
+        <input type="date" class="form-input" id="g-fecha">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notas</label>
+        <input type="text" class="form-input" id="g-notas" placeholder="Opcional...">
+      </div>
+    </div>
+    <button class="btn-main" onclick="saveGasto()">Guardar gasto</button>
+  </div>
+</div>
+
+<!-- DRAWER: CREAR GRUPO -->
+<div class="drawer" id="drawer-grupo">
+  <div class="drawer-handle"></div>
+  <div class="drawer-header">
+    <div class="drawer-title">Nuevo grupo</div>
+    <button class="drawer-close" onclick="closeDrawer('grupo')">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="form-group">
+      <label class="form-label">Nombre del grupo</label>
+      <input type="text" class="form-input" id="grupo-nombre" placeholder="Ej: Familia, Piso, Viaje...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Descripción (opcional)</label>
+      <input type="text" class="form-input" id="grupo-desc" placeholder="De qué va el grupo">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Moneda principal</label>
+      <select class="form-select" id="grupo-moneda">
+        <option value="EUR">Euro (€)</option>
+        <option value="USD">Dólar ($)</option>
+        <option value="GBP">Libra (£)</option>
+      </select>
+    </div>
+    <button class="btn-main" onclick="crearGrupo()">Crear grupo</button>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://whaevtysnloouvbbcyyf.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_OsigGuyKMZgI0QNp30QMYQ_u3i9VwtO';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const CATS = ['🛒 Compras','🏠 Hogar','🍽️ Restaurante','✈️ Viaje','🎉 Ocio','💊 Salud','📚 Educación','💡 Suministros','🚗 Transporte','💰 Otros'];
+const METS = ['Bizum','Tarjeta','Efectivo','Transferencia','Domiciliación'];
+const COLORS = ['#007aff','#34c759','#ff9500','#ff3b30','#af52de','#5ac8fa','#ffcc00'];
+
+let user = null, profile = null;
+let gastos = [], grupos = [], miembros = {};
+let currentGrupo = null, currentGrupoMiembros = [];
+let currentTab = 'home';
+let selQuien = null, selPara = [], selCat = null, selMet = null;
+let addingGastoGrupoId = null, addingPersonal = false;
+let chatMsgs = [], pendingArgs = null, reconocimiento = null, grabando = false;
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  await new Promise(r => setTimeout(r, 2000));
+  if (session?.user) {
+    user = session.user;
+    await loadProfile();
+    showScreen('home');
+    loadHome();
+  } else {
+    showScreen('auth');
+  }
+}
+
+// ── SCREENS ───────────────────────────────────────────────────────────────────
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => {
+    s.classList.add(s.id.includes('grupo') || s.id.includes('personal') || s.id.includes('profile') ? 'slide-left' : 'hidden');
+  });
+  const el = document.getElementById('screen-' + name);
+  el.classList.remove('hidden', 'slide-left');
+}
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+let authMode = 'login';
+function authTab(mode) {
+  authMode = mode;
+  document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('on', (i===0&&mode==='login')||(i===1&&mode==='signup')));
+  document.getElementById('field-nombre').style.display = mode === 'signup' ? 'block' : 'none';
+  document.getElementById('auth-btn').textContent = mode === 'login' ? 'Entrar' : 'Crear cuenta';
+  document.getElementById('auth-error').classList.remove('show');
+}
+
+async function doAuth() {
+  const email = document.getElementById('inp-email').value.trim();
+  const pass  = document.getElementById('inp-pass').value;
+  const nombre = document.getElementById('inp-nombre').value.trim();
+  const errEl = document.getElementById('auth-error');
+  errEl.classList.remove('show');
+  if (!email || !pass) { errEl.textContent = 'Rellena email y contraseña.'; errEl.classList.add('show'); return; }
+  if (authMode === 'signup' && !nombre) { errEl.textContent = 'Pon tu nombre.'; errEl.classList.add('show'); return; }
+  document.getElementById('auth-btn').textContent = '...';
+  try {
+    if (authMode === 'login') {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+      if (error) throw error;
+      user = data.user;
+    } else {
+      const { data, error } = await sb.auth.signUp({ email, password: pass, options: { data: { nombre } } });
+      if (error) throw error;
+      user = data.user;
+    }
+    await loadProfile();
+    showScreen('home');
+    loadHome();
+  } catch(e) {
+    errEl.textContent = e.message === 'Invalid login credentials' ? 'Email o contraseña incorrectos.' : e.message;
+    errEl.classList.add('show');
+    document.getElementById('auth-btn').textContent = authMode === 'login' ? 'Entrar' : 'Crear cuenta';
+  }
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  user = null; profile = null;
+  showScreen('auth');
+}
+
+// ── PROFILE ───────────────────────────────────────────────────────────────────
+async function loadProfile() {
+  const { data } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  profile = data;
+  updateProfileUI();
+}
+
+function updateProfileUI() {
+  if (!profile) return;
+  const initial = (profile.nombre || 'U')[0].toUpperCase();
+  const color = COLORS[profile.nombre.charCodeAt(0) % COLORS.length];
+  document.getElementById('home-avatar').textContent = initial;
+  document.getElementById('home-avatar').style.background = color;
+  document.getElementById('home-greeting').textContent = `Hola, ${profile.nombre.split(' ')[0]} 👋`;
+  document.getElementById('profile-av').textContent = initial;
+  document.getElementById('profile-av').style.background = color;
+  document.getElementById('profile-name').textContent = profile.nombre;
+  document.getElementById('profile-email').textContent = user.email;
+}
+
+function showProfile() { showScreen('profile'); }
+function hideProfile() { showScreen('home'); }
+
+async function showEditNombre() {
+  const nombre = prompt('Nuevo nombre:', profile.nombre);
+  if (!nombre || nombre === profile.nombre) return;
+  await sb.from('profiles').update({ nombre }).eq('id', user.id);
+  profile.nombre = nombre;
+  updateProfileUI();
+  toast('Nombre actualizado');
+}
+
+// ── HOME ──────────────────────────────────────────────────────────────────────
+async function loadHome() {
+  loadGrupos();
+  loadPersonalSummary();
+}
+
+async function loadPersonalSummary() {
+  const { data } = await sb.from('gastos').select('importe').eq('user_id', user.id).eq('es_personal', true);
+  const total = (data || []).reduce((a, g) => a + parseFloat(g.importe), 0);
+  document.getElementById('personal-total').textContent = fmt(total, 'EUR');
+  document.getElementById('personal-meta').textContent = `${(data||[]).length} gastos personales`;
+}
+
+async function loadGrupos() {
+  const { data: mbs } = await sb.from('grupo_miembros').select('grupo_id').eq('user_id', user.id);
+  if (!mbs?.length) { renderGruposList([]); return; }
+  const ids = mbs.map(m => m.grupo_id);
+  const { data } = await sb.from('grupos').select('*').in('id', ids);
+  grupos = data || [];
+  renderGruposList(grupos);
+}
+
+function renderGruposList(gs) {
+  const el = document.getElementById('grupos-list');
+  if (!gs.length) {
+    el.innerHTML = '<div class="card"><div class="card-row" style="color:var(--muted);font-size:14px;justify-content:center">No tienes grupos todavía</div></div>';
+    return;
+  }
+  el.innerHTML = gs.map(g => `
+    <div class="card" style="margin-bottom:8px">
+      <div class="card-row" onclick="openGrupo('${g.id}')">
+        <div class="card-icon purple" style="font-size:20px">${g.nombre[0].toUpperCase()}</div>
+        <div class="card-info">
+          <div class="card-name">${g.nombre}</div>
+          <div class="card-meta">${g.descripcion || 'Grupo compartido'}</div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+    </div>`).join('');
+}
+
+// ── GRUPO ─────────────────────────────────────────────────────────────────────
+async function openGrupo(id) {
+  currentGrupo = grupos.find(g => g.id === id) || (await sb.from('grupos').select('*').eq('id', id).single()).data;
+  document.getElementById('grupo-title').textContent = currentGrupo.nombre;
+  document.getElementById('grupo-avatar').textContent = currentGrupo.nombre[0].toUpperCase();
+  showScreen('grupo');
+  await loadGrupoMiembros();
+  grupoTab('gastos');
+}
+
+async function loadGrupoMiembros() {
+  const { data } = await sb.from('grupo_miembros').select('*, profiles(*)').eq('grupo_id', currentGrupo.id);
+  currentGrupoMiembros = data || [];
+  document.getElementById('grupo-members-count').textContent = `${currentGrupoMiembros.length} miembro${currentGrupoMiembros.length !== 1 ? 's' : ''}`;
+}
+
+function grupoTab(tab) {
+  document.querySelectorAll('.grupo-tab').forEach((t, i) => t.classList.toggle('on', ['gastos','dashboard','ia','miembros'][i] === tab));
+  const el = document.getElementById('grupo-content');
+  if (tab === 'gastos') renderGrupoGastos(el);
+  else if (tab === 'dashboard') renderGrupoDashboard(el);
+  else if (tab === 'ia') renderChat(el, currentGrupo.id);
+  else if (tab === 'miembros') renderMiembros(el);
+}
+
+async function renderGrupoGastos(el) {
+  el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Cargando...</div>';
+  const { data } = await sb.from('gastos').select('*, profiles!gastos_quien_paga_fkey(nombre)').eq('grupo_id', currentGrupo.id).order('fecha', { ascending: false });
+  gastos = data || [];
+  if (!gastos.length) { el.innerHTML = emptyState('💸', 'Sin gastos', 'Añade el primer gasto del grupo'); return; }
+  el.innerHTML = gastos.map(g => gastoRow(g)).join('');
+}
+
+async function renderGrupoDashboard(el) {
+  el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Calculando...</div>';
+  const { data } = await sb.from('gastos').select('*, profiles!gastos_quien_paga_fkey(nombre)').eq('grupo_id', currentGrupo.id);
+  const gs = data || [];
+  const total = gs.reduce((a, g) => a + parseFloat(g.importe), 0);
+  const porPersona = {};
+  currentGrupoMiembros.forEach(m => { porPersona[m.user_id] = { nombre: m.profiles.nombre, total: 0 }; });
+  gs.forEach(g => { if (porPersona[g.quien_paga]) porPersona[g.quien_paga].total += parseFloat(g.importe); });
+  const vals = Object.values(porPersona).sort((a,b) => b.total - a.total);
+  const maxVal = vals[0]?.total || 1;
+  el.innerHTML = `
+    <div class="dash-total">
+      <div class="dash-total-lbl">Total gastado</div>
+      <div class="dash-total-val">${fmt(total, currentGrupo.moneda)}</div>
+      <div class="dash-total-sub">${gs.length} gastos · ${currentGrupoMiembros.length} personas</div>
+    </div>
+    <div class="bar-chart">
+      <div class="bar-chart-title">Por persona</div>
+      ${vals.map(p => `
+        <div class="bar-row">
+          <div class="bar-label">${p.nombre}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${total?Math.round(p.total/maxVal*100):0}%;background:var(--accent)"></div></div>
+          <div class="bar-val">${fmt(p.total, currentGrupo.moneda)}</div>
+        </div>`).join('')}
+    </div>
+    <div class="bar-chart">
+      <div class="bar-chart-title">Por categoría</div>
+      ${renderCatBars(gs, currentGrupo.moneda, total)}
+    </div>`;
+}
+
+function renderCatBars(gs, moneda, total) {
+  const cats = {};
+  gs.forEach(g => { cats[g.categoria] = (cats[g.categoria]||0) + parseFloat(g.importe); });
+  const sorted = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const max = sorted[0]?.[1] || 1;
+  return sorted.map(([k,v]) => `
+    <div class="bar-row">
+      <div class="bar-label">${k.split(' ').slice(1).join(' ')||k}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/max*100)}%;background:var(--warning)"></div></div>
+      <div class="bar-val">${fmt(v, moneda)}</div>
+    </div>`).join('');
+}
+
+function renderMiembros(el) {
+  const isOwner = currentGrupo.owner_id === user.id;
+  const inviteSection = isOwner ? `
+    <div style="margin-top:20px">
+      <div class="form-group">
+        <label class="form-label">Invitar por enlace</label>
+        <button class="btn-main ghost" onclick="generarInvite()" style="margin-top:0">Generar enlace de invitación</button>
+      </div>
+      <div id="invite-link-wrap" style="display:none">
+        <div class="invite-link" id="invite-link-txt"></div>
+        <button class="btn-main" onclick="copiarInvite()">Copiar enlace</button>
+      </div>
+    </div>` : '';
+  el.innerHTML = `
+    <div>${currentGrupoMiembros.map(m => {
+      const color = COLORS[m.profiles.nombre.charCodeAt(0) % COLORS.length];
+      const inicial = m.profiles.nombre[0].toUpperCase();
+      return `<div class="member-row">
+        <div class="member-av" style="background:${color}">${inicial}</div>
+        <div class="member-info">
+          <div class="member-name">${m.profiles.nombre}${m.user_id === user.id ? ' (tú)' : ''}</div>
+          <div class="member-role">${m.user_id === currentGrupo.owner_id ? 'Admin' : 'Miembro'}</div>
+        </div>
+      </div>`;
+    }).join('')}</div>
+    ${inviteSection}`;
+}
+
+async function generarInvite() {
+  const { data, error } = await sb.from('invitaciones').insert({ grupo_id: currentGrupo.id, created_by: user.id }).select().single();
+  if (error) { toast('Error al generar el enlace'); return; }
+  const link = `${window.location.origin}${window.location.pathname}?invite=${data.token}`;
+  document.getElementById('invite-link-txt').textContent = link;
+  document.getElementById('invite-link-wrap').style.display = 'block';
+  window._inviteLink = link;
+}
+
+function copiarInvite() {
+  navigator.clipboard.writeText(window._inviteLink).then(() => toast('Enlace copiado'));
+}
+
+async function checkInvite() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('invite');
+  if (!token || !user) return;
+  const { data: inv } = await sb.from('invitaciones').select('*, grupos(nombre)').eq('token', token).single();
+  if (!inv || inv.used_at) { toast('Este enlace ya no es válido'); return; }
+  if (confirm(`¿Unirte al grupo "${inv.grupos.nombre}"?`)) {
+    await sb.from('grupo_miembros').insert({ grupo_id: inv.grupo_id, user_id: user.id });
+    await sb.from('invitaciones').update({ used_at: new Date().toISOString() }).eq('id', inv.id);
+    window.history.replaceState({}, '', window.location.pathname);
+    toast(`Te has unido a "${inv.grupos.nombre}"`);
+    loadHome();
+  }
+}
+
+// ── PERSONAL ──────────────────────────────────────────────────────────────────
+async function openPersonal() {
+  showScreen('personal');
+  personalTab('gastos');
+}
+
+function personalTab(tab) {
+  document.querySelectorAll('#screen-personal .grupo-tab').forEach((t,i) => t.classList.toggle('on', ['gastos','dashboard','ia'][i]===tab));
+  const el = document.getElementById('personal-content');
+  if (tab === 'gastos') renderPersonalGastos(el);
+  else if (tab === 'dashboard') renderPersonalDashboard(el);
+  else if (tab === 'ia') renderChat(el, null);
+}
+
+async function renderPersonalGastos(el) {
+  el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Cargando...</div>';
+  const { data } = await sb.from('gastos').select('*').eq('user_id', user.id).eq('es_personal', true).order('fecha', {ascending:false});
+  const gs = data || [];
+  document.getElementById('personal-count').textContent = `${gs.length} gastos`;
+  if (!gs.length) { el.innerHTML = emptyState('💰','Sin gastos','Añade tu primer gasto personal'); return; }
+  el.innerHTML = '<div>' + gs.map(g => gastoRow(g)).join('') + '</div>';
+}
+
+async function renderPersonalDashboard(el) {
+  const { data } = await sb.from('gastos').select('*').eq('user_id', user.id).eq('es_personal', true);
+  const gs = data || [];
+  const total = gs.reduce((a,g) => a+parseFloat(g.importe), 0);
+  el.innerHTML = `
+    <div class="dash-total">
+      <div class="dash-total-lbl">Total personal</div>
+      <div class="dash-total-val">${fmt(total,'EUR')}</div>
+      <div class="dash-total-sub">${gs.length} gastos</div>
+    </div>
+    <div class="bar-chart">
+      <div class="bar-chart-title">Por categoría</div>
+      ${renderCatBars(gs,'EUR',total)}
+    </div>`;
+}
+
+// ── ADD GASTO ─────────────────────────────────────────────────────────────────
+function showAddGasto(grupoId, personal = false) {
+  addingGastoGrupoId = grupoId;
+  addingPersonal = personal;
+  selQuien = user.id;
+  selPara = [];
+  selCat = null;
+  selMet = null;
+  document.getElementById('g-importe').value = '';
+  document.getElementById('g-concepto').value = '';
+  document.getElementById('g-notas').value = '';
+  document.getElementById('g-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('g-moneda').value = currentGrupo?.moneda || 'EUR';
+  const miembrosActivos = grupoId ? currentGrupoMiembros : [{ user_id: user.id, profiles: profile }];
+  document.getElementById('g-quien-wrap').style.display = grupoId ? 'block' : 'none';
+  document.getElementById('g-para-wrap').style.display = grupoId ? 'block' : 'none';
+  if (grupoId) {
+    document.getElementById('g-quien-chips').innerHTML = miembrosActivos.map(m => chipMember(m, 'quien', m.user_id === user.id)).join('');
+    document.getElementById('g-para-chips').innerHTML = miembrosActivos.map(m => chipMemberPara(m, true)).join('');
+    selPara = miembrosActivos.map(m => m.user_id);
+  }
+  document.getElementById('g-cat-chips').innerHTML = CATS.map(c => `<div class="chip" onclick="selChip(this,'cat','${c}')">${c}</div>`).join('');
+  document.getElementById('g-met-chips').innerHTML = METS.map(m => `<div class="chip" onclick="selChip(this,'met','${m}')">${m}</div>`).join('');
+  openDrawer('gasto');
+}
+
+function chipMember(m, type, selected) {
+  const color = COLORS[m.profiles.nombre.charCodeAt(0) % COLORS.length];
+  const inicial = m.profiles.nombre[0].toUpperCase();
+  return `<div class="member-chip ${selected?'on':''}" onclick="selMiembro(this,'${m.user_id}','${type}')">
+    <div class="mini-av" style="background:${color}">${inicial}</div>
+    <div class="mc-name">${m.profiles.nombre}</div>
+  </div>`;
+}
+
+function chipMemberPara(m, selected) {
+  const color = COLORS[m.profiles.nombre.charCodeAt(0) % COLORS.length];
+  const inicial = m.profiles.nombre[0].toUpperCase();
+  return `<div class="member-chip ${selected?'on':''}" onclick="selMiembroPara(this,'${m.user_id}')">
+    <div class="mini-av" style="background:${color}">${inicial}</div>
+    <div class="mc-name">${m.profiles.nombre}</div>
+  </div>`;
+}
+
+function selMiembro(el, uid, type) {
+  document.querySelectorAll('#g-quien-chips .member-chip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+  selQuien = uid;
+}
+
+function selMiembroPara(el, uid) {
+  el.classList.toggle('on');
+  if (selPara.includes(uid)) selPara = selPara.filter(u => u !== uid);
+  else selPara.push(uid);
+}
+
+function selChip(el, type, val) {
+  const parent = el.parentElement;
+  parent.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+  if (type === 'cat') selCat = val;
+  if (type === 'met') selMet = val;
+}
+
+async function saveGasto() {
+  const importe = parseFloat(document.getElementById('g-importe').value);
+  const concepto = document.getElementById('g-concepto').value.trim();
+  const moneda = document.getElementById('g-moneda').value;
+  const fecha = document.getElementById('g-fecha').value;
+  const notas = document.getElementById('g-notas').value.trim();
+  if (!importe || !concepto) { toast('Rellena importe y concepto'); return; }
+  if (!selCat) { toast('Elige una categoría'); return; }
+  if (!selMet) { toast('Elige un método de pago'); return; }
+  const gasto = {
+    user_id: user.id,
+    grupo_id: addingGastoGrupoId || null,
+    concepto, importe, moneda,
+    quien_paga: selQuien || user.id,
+    metodo: selMet,
+    categoria: selCat,
+    fecha, notas,
+    es_personal: addingPersonal || !addingGastoGrupoId
+  };
+  const { data, error } = await sb.from('gastos').insert(gasto).select().single();
+  if (error) { toast('Error al guardar'); return; }
+  if (addingGastoGrupoId && selPara.length) {
+    const parts = selPara.map(uid => ({ gasto_id: data.id, user_id: uid, porcentaje: 100/selPara.length }));
+    await sb.from('gasto_participantes').insert(parts);
+  }
+  closeDrawer();
+  toast('Gasto guardado ✓');
+  if (addingGastoGrupoId) grupoTab('gastos');
+  else if (addingPersonal) personalTab('gastos');
+  loadHome();
+}
+
+// ── CREAR GRUPO ───────────────────────────────────────────────────────────────
+function showCrearGrupo() { openDrawer('grupo'); }
+
+async function crearGrupo() {
+  const nombre = document.getElementById('grupo-nombre').value.trim();
+  const desc = document.getElementById('grupo-desc').value.trim();
+  const moneda = document.getElementById('grupo-moneda').value;
+  if (!nombre) { toast('Pon un nombre al grupo'); return; }
+  const { data, error } = await sb.from('grupos').insert({ nombre, descripcion: desc, moneda, owner_id: user.id }).select().single();
+  if (error) { toast('Error al crear grupo'); return; }
+  await sb.from('grupo_miembros').insert({ grupo_id: data.id, user_id: user.id, rol: 'admin' });
+  closeDrawer('grupo');
+  toast(`Grupo "${nombre}" creado`);
+  loadHome();
+  setTimeout(() => openGrupo(data.id), 500);
+}
+
+// ── CHAT IA ───────────────────────────────────────────────────────────────────
+function renderChat(el, grupoId) {
+  const saved = JSON.parse(localStorage.getItem('chat-' + (grupoId||'personal')) || '[]');
+  el.innerHTML = `<div class="chat-wrap">
+    <div class="chat-msgs" id="chat-msgs-el">
+      ${saved.length ? saved.map(m => `<div class="msg ${m.role}">${m.html}</div>`).join('') : 
+        `<div class="msg ia">¡Hola! Dime qué gasto quieres añadir. Puedes escribir o usar el micrófono 🎤</div>`}
+    </div>
+    <div class="chat-input-row">
+      <input type="text" class="chat-txt" id="chat-input-el" placeholder="Escribe un gasto..." onkeypress="if(event.key==='Enter')sendChat('${grupoId||''}')">
+      <button class="chat-btn chat-mic" id="chat-mic-btn" onclick="toggleMic('${grupoId||''}')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm0 2a2 2 0 0 0-2 2v6a2 2 0 0 0 4 0V5a2 2 0 0 0-2-2zm-1 14.93V20H9v2h6v-2h-2v-2.07A7 7 0 0 0 19 11h-2a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.93z"/></svg>
+      </button>
+      <button class="chat-btn chat-send" onclick="sendChat('${grupoId||''}')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
+      </button>
+    </div>
+  </div>`;
+  el.querySelector('.chat-msgs').scrollTop = 9999;
+  chatMsgs = saved.map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text||'' }] }));
+}
+
+function appendMsg(role, html, text, grupoId) {
+  const el = document.getElementById('chat-msgs-el');
+  if (!el) return;
+  const div = document.createElement('div');
+  div.className = 'msg ' + (role === 'user' ? 'user' : 'ia');
+  div.innerHTML = html;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+  if (text !== null) {
+    const key = 'chat-' + (grupoId||'personal');
+    const saved = JSON.parse(localStorage.getItem(key)||'[]');
+    saved.push({ role, html, text });
+    localStorage.setItem(key, JSON.stringify(saved.slice(-40)));
+  }
+}
+
+function appendTyping() {
+  const el = document.getElementById('chat-msgs-el');
+  if (!el) return null;
+  const div = document.createElement('div');
+  div.className = 'msg ia';
+  div.id = 'typing-dot';
+  div.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+  return div;
+}
+
+async function sendChat(grupoId) {
+  const key = localStorage.getItem('GEMINI_KEY');
+  if (!key) { toast('Configura tu API key de Gemini en ajustes'); return; }
+  const input = document.getElementById('chat-input-el');
+  const msg = input?.value.trim();
+  if (!msg) return;
+  input.value = '';
+  appendMsg('user', escHtml(msg), msg, grupoId);
+  chatMsgs.push({ role: 'user', parts: [{ text: msg }] });
+  const typing = appendTyping();
+  const miembrosCtx = grupoId ? currentGrupoMiembros.map(m => m.profiles.nombre + ' (id:' + m.user_id + ')').join(', ') : profile.nombre + ' (id:' + user.id + ')';
+  const sys = `Eres un asistente para registrar gastos. Hoy es ${new Date().toISOString().split('T')[0]}.
+Personas disponibles: ${miembrosCtx}.
+Categorías: ${CATS.join(', ')}.
+Métodos: ${METS.join(', ')}.
+Moneda del grupo: ${currentGrupo?.moneda||'EUR'}.
+Si el usuario quiere registrar un gasto y tienes todos los datos (concepto, importe, quién paga, categoría, método), usa la herramienta registrar_gasto. Si falta algo, pregunta solo lo que falta. Sé breve.`;
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-latest:generateContent?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: sys }] },
+        contents: chatMsgs,
+        tools: [{ functionDeclarations: [{
+          name: 'registrar_gasto',
+          description: 'Registra un gasto',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              concepto: { type: 'STRING' },
+              importe: { type: 'NUMBER' },
+              quien_paga_id: { type: 'STRING', description: 'ID del usuario que paga' },
+              categoria: { type: 'STRING' },
+              metodo: { type: 'STRING' },
+              moneda: { type: 'STRING' },
+              fecha: { type: 'STRING', description: 'YYYY-MM-DD' },
+              notas: { type: 'STRING' },
+              para_ids: { type: 'STRING', description: 'IDs separados por coma de para quién es el gasto' }
+            },
+            required: ['concepto','importe','quien_paga_id','categoria','metodo']
+          }
+        }]}]
+      })
+    });
+    const data = await res.json();
+    typing?.remove();
+    const part = data.candidates?.[0]?.content?.parts?.[0];
+    if (!part) throw new Error('Respuesta vacía');
+    if (part.functionCall) {
+      showConfirm(part.functionCall.args, grupoId);
+    } else {
+      const txt = part.text || '';
+      appendMsg('ia', escHtml(txt), txt, grupoId);
+      chatMsgs.push(data.candidates[0].content);
+    }
+  } catch(e) {
+    typing?.remove();
+    appendMsg('ia', '❌ Error de conexión', null, grupoId);
+  }
+}
+
+function showConfirm(args, grupoId) {
+  pendingArgs = { ...args, grupoId };
+  const quien = currentGrupoMiembros.find(m => m.user_id === args.quien_paga_id)?.profiles?.nombre || profile?.nombre;
+  const el = document.getElementById('chat-msgs-el');
+  const div = document.createElement('div');
+  div.className = 'msg confirm';
+  div.id = 'confirm-msg';
+  div.innerHTML = `
+    <div style="font-weight:700;margin-bottom:8px;font-size:15px">¿Confirmas este gasto?</div>
+    <div class="confirm-grid">
+      <span class="confirm-key">Concepto</span><span class="confirm-val">${escHtml(args.concepto)}</span>
+      <span class="confirm-key">Importe</span><span class="confirm-val" style="font-size:18px;font-weight:700">${fmtNum(args.importe)} ${args.moneda||currentGrupo?.moneda||'€'}</span>
+      <span class="confirm-key">Quién paga</span><span class="confirm-val">${quien||'—'}</span>
+      <span class="confirm-key">Categoría</span><span class="confirm-val">${args.categoria}</span>
+      <span class="confirm-key">Método</span><span class="confirm-val">${args.metodo}</span>
+      <span class="confirm-key">Fecha</span><span class="confirm-val">${args.fecha||new Date().toISOString().split('T')[0]}</span>
+    </div>
+    <div class="confirm-btns">
+      <button class="confirm-btn cancel" onclick="cancelConfirm()">Cancelar</button>
+      <button class="confirm-btn ok" onclick="doConfirm()">✓ Confirmar</button>
+    </div>`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function cancelConfirm() {
+  document.getElementById('confirm-msg')?.remove();
+  pendingArgs = null;
+  appendMsg('ia', 'Cancelado. ¿Quieres cambiar algo?', 'Cancelado.', pendingArgs?.grupoId||'');
+}
+
+async function doConfirm() {
+  if (!pendingArgs) return;
+  document.getElementById('confirm-msg')?.remove();
+  const args = pendingArgs; pendingArgs = null;
+  const gasto = {
+    user_id: user.id,
+    grupo_id: args.grupoId || null,
+    concepto: args.concepto,
+    importe: args.importe,
+    moneda: args.moneda || currentGrupo?.moneda || 'EUR',
+    quien_paga: args.quien_paga_id || user.id,
+    metodo: args.metodo,
+    categoria: args.categoria,
+    fecha: args.fecha || new Date().toISOString().split('T')[0],
+    notas: args.notas || '',
+    es_personal: !args.grupoId
+  };
+  const { data, error } = await sb.from('gastos').insert(gasto).select().single();
+  if (error) { appendMsg('ia', '❌ Error al guardar', null, args.grupoId); return; }
+  if (args.grupoId && args.para_ids) {
+    const ids = args.para_ids.split(',').map(s=>s.trim()).filter(Boolean);
+    if (ids.length) await sb.from('gasto_participantes').insert(ids.map(uid=>({gasto_id:data.id,user_id:uid,porcentaje:100/ids.length})));
+  }
+  const msg = `✅ Guardado: **${args.importe} €** de "${args.concepto}"`;
+  appendMsg('ia', escHtml(msg).replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>'), msg, args.grupoId);
+  toast('Gasto guardado ✓');
+  if (args.grupoId) grupoTab('gastos');
+  else personalTab('gastos');
+  loadHome();
+}
+
+// ── MICRÓFONO ─────────────────────────────────────────────────────────────────
+function toggleMic(grupoId) {
+  if (grabando) { pararMic(); return; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { toast('Tu navegador no soporta voz'); return; }
+  reconocimiento = new SR();
+  reconocimiento.lang = 'es-ES';
+  reconocimiento.continuous = false;
+  reconocimiento.interimResults = true;
+  reconocimiento.onstart = () => {
+    grabando = true;
+    document.getElementById('chat-mic-btn')?.classList.add('on');
+    document.getElementById('chat-input-el').placeholder = 'Escuchando...';
+  };
+  reconocimiento.onresult = (e) => {
+    let txt = '';
+    for (let i=0;i<e.results.length;i++) txt+=e.results[i][0].transcript;
+    if (document.getElementById('chat-input-el')) document.getElementById('chat-input-el').value = txt;
+  };
+  reconocimiento.onend = () => {
+    grabando = false;
+    document.getElementById('chat-mic-btn')?.classList.remove('on');
+    if (document.getElementById('chat-input-el')) document.getElementById('chat-input-el').placeholder = 'Escribe un gasto...';
+    const txt = document.getElementById('chat-input-el')?.value.trim();
+    if (txt) sendChat(grupoId);
+  };
+  reconocimiento.onerror = () => {
+    grabando = false;
+    document.getElementById('chat-mic-btn')?.classList.remove('on');
+    if (document.getElementById('chat-input-el')) document.getElementById('chat-input-el').placeholder = 'Escribe un gasto...';
+  };
+  reconocimiento.start();
+}
+
+function pararMic() {
+  reconocimiento?.stop();
+  reconocimiento = null;
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function gastoRow(g) {
+  const cat = g.categoria || '💰 Otros';
+  const emoji = cat.split(' ')[0];
+  const quien = g.profiles?.nombre || 'Yo';
+  return `<div class="gasto-row">
+    <div class="gasto-cat-icon">${emoji}</div>
+    <div class="gasto-info">
+      <div class="gasto-concepto">${escHtml(g.concepto)}</div>
+      <div class="gasto-meta">${g.fecha} · ${g.metodo}</div>
+    </div>
+    <div class="gasto-right">
+      <div class="gasto-amount">${fmt(g.importe, g.moneda)}</div>
+      <div class="gasto-quien">${quien}</div>
+    </div>
+  </div>`;
+}
+
+function emptyState(icon, title, sub) {
+  return `<div class="empty"><div class="empty-icon">${icon}</div><div class="empty-title">${title}</div><div class="empty-sub">${sub}</div></div>`;
+}
+
+function fmt(n, moneda) {
+  const symbols = { EUR:'€', USD:'$', GBP:'£', KRW:'₩', JPY:'¥' };
+  return fmtNum(n) + ' ' + (symbols[moneda]||moneda||'€');
+}
+
+function fmtNum(n) {
+  return parseFloat(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function escHtml(t) { return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function openDrawer(name='gasto') {
+  document.getElementById('drawer-bg').classList.add('show');
+  document.getElementById('drawer-'+(name)).classList.add('show');
+}
+
+function closeDrawer(name='gasto') {
+  document.getElementById('drawer-bg').classList.remove('show');
+  document.getElementById('drawer-'+name).classList.remove('show');
+}
+
+function goHome() {
+  currentGrupo = null;
+  currentGrupoMiembros = [];
+  showScreen('home');
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── START ─────────────────────────────────────────────────────────────────────
+init().then(() => checkInvite());
+</script>
+</body>
+</html>
