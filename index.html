@@ -1036,8 +1036,6 @@ function appendTyping() {
 }
 
 async function sendChat(grupoId) {
-  const key = localStorage.getItem('GEMINI_KEY');
-  if (!key) { toast('Configura tu API key de Gemini en ajustes'); return; }
   const input = document.getElementById('chat-input-el');
   const msg = input?.value.trim();
   if (!msg) return;
@@ -1053,10 +1051,13 @@ Métodos: ${METS.join(', ')}.
 Moneda del grupo: ${currentGrupo?.moneda||'EUR'}.
 Si el usuario quiere registrar un gasto y tienes todos los datos (concepto, importe, quién paga, categoría, método), usa la herramienta registrar_gasto. Si falta algo, pregunta solo lo que falta. Sé breve.`;
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-latest:generateContent?key=${key}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+const res = await fetch(`https://whaevtysnloouvbbcyyf.supabase.co/functions/v1/quick-processor`, {
+  method: 'POST',
+  headers: { 
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${SUPABASE_KEY}`
+  },
+  body: JSON.stringify({
         systemInstruction: { parts: [{ text: sys }] },
         contents: chatMsgs,
         tools: [{ functionDeclarations: [{
