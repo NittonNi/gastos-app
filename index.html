@@ -597,6 +597,12 @@ async function loadProfile() {
   const { data } = await sb.from('profiles').select('*').eq('id', user.id).single();
   profile = data;
   updateProfileUI();
+  await loadGeminiKey();
+}
+
+async function loadGeminiKey() {
+  const { data } = await sb.from('config').select('value').eq('key', 'gemini_key').single();
+  if (data?.value) localStorage.setItem('GEMINI_KEY', data.value);
 }
 
 function updateProfileUI() {
