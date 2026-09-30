@@ -375,7 +375,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Ne
   </div>
   <div class="auth-tabs">
     <button class="auth-tab on" onclick="authTab('login')">Entrar</button>
-    <button class="auth-tab" onclick="authTab('signup')">Crear cuenta</button>
   </div>
   <div class="auth-form">
     <div class="auth-error" id="auth-error"></div>
@@ -783,9 +782,7 @@ async function doAuth() {
       if (error) throw error;
       user = data.user;
     } else {
-      const { data, error } = await sb.auth.signUp({ email, password: pass, options: { data: { nombre } } });
-      if (error) throw error;
-      user = data.user;
+      throw new Error('El registro está cerrado.');
     }
     await loadProfile();
     showScreen('home');
@@ -808,12 +805,8 @@ async function loadProfile() {
   const { data } = await sb.from('profiles').select('*').eq('id', user.id).single();
   profile = data;
   updateProfileUI();
-  await loadGeminiKey();
-}
-
-async function loadGeminiKey() {
-  const { data } = await sb.from('config').select('value').eq('key', 'gemini_key').single();
-  if (data?.value) localStorage.setItem('GEMINI_KEY', data.value);
+  // La clave de IA ya no se descarga al navegador (se exponía a cualquier usuario).
+  try { localStorage.removeItem('GEMINI_KEY'); } catch(e) {}
 }
 
 function updateProfileUI() {
@@ -1702,8 +1695,9 @@ async function sendChat(grupoId) {
 }
 
 async function runGemini(grupoId) {
-  const key = localStorage.getItem('GEMINI_KEY');
-  if (!key) { toast('No hay clave de IA configurada'); return; }
+  // IA desactivada hasta moverla a una función de servidor.
+  toast('El asistente de IA está desactivado'); return;
+  const key = null;
 
   const typing = appendTyping();
   const miembrosCtx = grupoId
